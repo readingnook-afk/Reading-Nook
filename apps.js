@@ -9,7 +9,7 @@
 /* ---------- 1. Configuração e estado ---------- */
 const PARAMS = new URLSearchParams(location.search);
 const EDITAR = PARAMS.has('editar');
-const CHAVE_RASCUNHO = 'diario-leituras:rascunho:v1'; // só existe no modo de edição
+const CHAVE_RASCUNHO = 'diario-leituras:rascunho:v1';
 const CHAVE_TEMA = 'diario-leituras:tema';
 const ANO_ATUAL = new Date().getFullYear();
 
@@ -20,7 +20,6 @@ const CONFIG_PADRAO = {
   meta_anual: 52
 };
 
-/* Modelo de um livro (função para sempre gerar objetos/arrays novos) */
 const novoModelo = () => ({
   id: 0, exemplo: false, titulo: '', subtitulo: '', autores: [], serie: '', numero_na_serie: null,
   generos: [], tags: [], paginas: null, editora: '', ano_publicacao: null, idioma: '', formato: '',
@@ -36,9 +35,9 @@ const CATEGORIAS = { enredo: 'Enredo', personagens: 'Personagens', escrita: 'Esc
 const AVISO_TRECHO = 'Cite apenas pequenos trechos, como apoio ao seu comentário.';
 
 let DB = { versao: 1, config: { ...CONFIG_PADRAO }, livros: [] };
-let alterado = false;          // há mudanças ainda não baixadas (modo de edição)
-let resolvendo = false;        // busca de capas em andamento
-const CAPAS = {};              // id -> { url } da capa que realmente carregou
+let alterado = false;
+let resolvendo = false;
+const CAPAS = {};
 
 /* ---------- 2. Utilidades ---------- */
 const $ = (s, r = document) => r.querySelector(s);
@@ -62,7 +61,6 @@ function anoLeitura(b) {
   if (b.data_termino) return b.data_termino.slice(0, 4);
   return b.ano_leitura ? String(b.ano_leitura) : '';
 }
-/* Chave de ordenação por data de leitura (cai para o ano e, por fim, o id) */
 function chaveLeitura(b) {
   const d = b.data_termino || (b.ano_leitura ? b.ano_leitura + '-00-00' : '0000-00-00');
   return d + '|' + String(b.id).padStart(6, '0');
@@ -88,7 +86,6 @@ const estadoVazio = (msg, extra = '') => `<div class="vazio">${ICONE_LIVRO}<p>${
 /* ---------- 3. Capas ---------- */
 const urlOL = isbn => `https://covers.openlibrary.org/b/isbn/${isbn}-M.jpg?default=false`;
 
-/* Fonte do crédito: campo capa_fonte, ou deduzida pelo endereço */
 function fonteDe(url, b) {
   if (b && b.capa_fonte) return 'Capa via ' + b.capa_fonte;
   if (/openlibrary|archive\.org/i.test(url)) return 'Capa via Open Library';
@@ -104,7 +101,6 @@ function atualizarCredito(id, texto) {
   $$(`[data-credito="${id}"]`).forEach(el => { el.textContent = texto; });
 }
 
-/* Ordem: (1) capa_url, (2) Open Library por ISBN; (3) Google Books é tentado depois, em falhaCapa() */
 function candidatosCapa(b) {
   const l = [];
   if (CAPAS[b.id]) l.push(CAPAS[b.id].url);
@@ -116,7 +112,6 @@ function candidatosCapa(b) {
 
 const capaTipo = b => `<div class="capa-tipo" aria-hidden="true"><span class="t">${esc(b.titulo)}</span><span class="fio"></span><span class="a">${esc(autoresTxt(b))}</span></div>`;
 
-/* Capa com proporção 2:3 reservada; a capa tipográfica fica por baixo da imagem (fallback 4) */
 function capaHTML(b, { eager = false } = {}) {
   const c = candidatosCapa(b);
   const alt = `Capa de ${b.titulo}, de ${autoresTxt(b)}`;
@@ -126,7 +121,6 @@ function capaHTML(b, { eager = false } = {}) {
   return `<div class="capa"${img ? '' : ` role="img" aria-label="${esc(alt)}"`}>${capaTipo(b)}${img}</div>`;
 }
 
-/* Eventos de carregamento das imagens (error não "borbulha": usa captura) */
 document.addEventListener('load', e => {
   const img = e.target;
   if (!(img instanceof HTMLImageElement) || !img.dataset.id) return;
@@ -151,12 +145,11 @@ async function falhaCapa(img) {
   const i = Number(img.dataset.i) + 1;
   if (i < c.length) { img.dataset.i = i; img.src = c[i]; return; }
   const isbn = limparIsbn(b.isbn);
-  if (isbn && !img.dataset.g) {            // (3) Google Books
+  if (isbn && !img.dataset.g) {
     img.dataset.g = '1';
     const url = await googleBusca('isbn:' + isbn);
     if (url) { img.src = url; return; }
   }
-  // (4) sem imagem: mantém só a capa tipográfica, com texto alternativo no contêiner
   const pai = img.parentElement;
   if (pai) {
     pai.setAttribute('role', 'img');
@@ -166,7 +159,6 @@ async function falhaCapa(img) {
   atualizarCredito(b.id, 'Capa tipográfica gerada pelo site');
 }
 
-/* Busca no Google Books; devolve o endereço da miniatura ou null */
 async function googleBusca(q) {
   try {
     const r = await fetch('https://www.googleapis.com/books/v1/volumes?maxResults=3&q=' + encodeURIComponent(q));
@@ -177,7 +169,7 @@ async function googleBusca(q) {
       const u = l && (l.thumbnail || l.smallThumbnail);
       if (u) return u.replace(/^http:/, 'https:').replace('&edge=curl', '');
     }
-  } catch (e) { /* sem rede ou bloqueado: segue o fallback */ }
+  } catch (e) { /* sem rede: segue o fallback */ }
   return null;
 }
 async function openLibraryPorTitulo(titulo, autor) {
@@ -200,7 +192,6 @@ function imagemOk(url) {
   });
 }
 
-/* Resolução de capa para o MODO DE EDIÇÃO: devolve { url, fonte } e quem chama grava em capa_url */
 async function resolverCapa(b) {
   const isbn = limparIsbn(b.isbn);
   if (isbn) {
@@ -233,12 +224,12 @@ function normalizar(b) {
 }
 
 async function carregar() {
-  let dados = null, erro = null;
+  let dados = null;
   try {
     const r = await fetch('livros.json', { cache: 'no-cache' });
     if (!r.ok) throw new Error('HTTP ' + r.status);
     dados = await r.json();
-  } catch (e) { erro = e; }
+  } catch (e) { console.error('Falha ao ler livros.json:', e); }
 
   if (EDITAR) {
     let rasc = null;
@@ -247,7 +238,7 @@ async function carregar() {
   }
   if (!dados) {
     if (!EDITAR) {
-      $('#conteudo').innerHTML = estadoVazio('Não foi possível carregar a biblioteca (livros.json). Se você abriu o arquivo direto do computador, use um servidor local ou publique o site.');
+      $('#conteudo').innerHTML = estadoVazio('Não foi possível carregar a biblioteca (livros.json). Confira se o arquivo está na raiz do repositório, com esse nome exato, e se o JSON é válido.');
       return false;
     }
     dados = { versao: 1, config: {}, livros: [] };
@@ -255,7 +246,6 @@ async function carregar() {
   DB.versao = dados.versao || 1;
   DB.config = { ...CONFIG_PADRAO, ...(dados.config || {}) };
   DB.livros = (dados.livros || []).map(normalizar);
-  // Notas privadas nunca aparecem no site público
   if (!EDITAR) DB.livros.forEach(l => { l.privado_notas = ''; });
   return true;
 }
@@ -282,7 +272,6 @@ const fileira = (lista, rotulo) => `<div class="fileira" tabindex="0" role="regi
 const PAGINAS = {};
 const LIGAR = {};
 
-/* ----- Início ----- */
 function graficoMeses(lidos) {
   const m = Array(12).fill(0);
   lidos.forEach(b => { if (b.data_termino && b.data_termino.startsWith(String(ANO_ATUAL))) m[Number(b.data_termino.slice(5, 7)) - 1]++; });
@@ -492,7 +481,7 @@ function sortear() {
   const b = l[Math.floor(Math.random() * l.length)];
   abrirModal(`<div class="sorteio">
     <div>${capaHTML(b, { eager: true })}</div>
-    <div><p class="sobretitulo" style="color:var(--sec);text-transform:uppercase;letter-spacing:.15em;font-size:.75rem">O sorteio escolheu</p>
+    <div><p style="color:var(--sec);text-transform:uppercase;letter-spacing:.15em;font-size:.75rem">O sorteio escolheu</p>
       <h2>${esc(b.titulo)}</h2><p>${esc(autoresTxt(b))}</p>
       ${b.motivo ? `<p class="motivo">${esc(b.motivo)}</p>` : ''}
       <div class="acoes-ficha"><a class="btn" href="#/livro/${b.id}" data-fechar>Ver ficha</a>
@@ -506,7 +495,7 @@ LIGAR.tbr = () => {
 /* ----- Reviews ----- */
 PAGINAS.reviews = () => {
   const l = DB.livros.filter(b => b.review.trim()).sort((a, b) => chaveLeitura(b).localeCompare(chaveLeitura(a)));
-  return `<div class="pagina-topo"><h1>Reviews</h1><p>Minhas impressões, com calma. Trechos entre barras duplas ficam borrados (spoilers) até o clique.</p></div>
+  return `<div class="pagina-topo"><h1>Reviews</h1><p>Minhas impressões, com calma. Trechos marcados como spoiler ficam borrados até o clique.</p></div>
     ${l.length ? l.map(b => `
       <article class="review">
         <a class="review-capa" href="#/livro/${b.id}" aria-label="Abrir ${esc(b.titulo)}">${capaHTML(b)}</a>
@@ -613,8 +602,10 @@ function render({ foco = true } = {}) {
   main.classList.remove('fade'); void main.offsetWidth; main.classList.add('fade');
   if (LIGAR[nome]) LIGAR[nome](arg);
   const ativo = nome === 'livro' ? 'estante' : nome === 'autor' ? 'series' : nome;
-  $$('#menu a').forEach(a => a.toggleAttribute('aria-current', a.dataset.rota === ativo) || a.removeAttribute('aria-current'));
-  $$('#menu a').forEach(a => { if (a.dataset.rota === ativo) a.setAttribute('aria-current', 'page'); });
+  $$('#menu a').forEach(a => {
+    if (a.dataset.rota === ativo) a.setAttribute('aria-current', 'page');
+    else a.removeAttribute('aria-current');
+  });
   const titulo = DB.config.titulo;
   const b = nome === 'livro' ? achar(arg) : null;
   document.title = b ? `${b.titulo} · ${titulo}` : titulo;
@@ -655,8 +646,7 @@ function aplicarTema(t) {
 }
 
 document.addEventListener('click', e => {
-  const t = e.target;
-  const q = sel => t.closest(sel);
+  const q = sel => e.target.closest(sel);
   let el;
   if ((el = q('[data-pular]'))) { e.preventDefault(); $('#conteudo').focus(); return; }
   if ((el = q('[data-ampliar]'))) { ampliar(el.dataset.ampliar); return; }
@@ -678,7 +668,6 @@ function revelar(el) {
   el.removeAttribute('aria-label');
   el.removeAttribute('role');
 }
-/* Fecha diálogos simples ao clicar no fundo (formulários de edição ficam de fora para não perder dados) */
 ['lightbox', 'modal'].forEach(id => {
   $('#' + id).addEventListener('click', e => {
     if (e.target.id === id && !e.target.classList.contains('largo')) e.target.close();
@@ -696,7 +685,6 @@ function persistir() {
   try { localStorage.setItem(CHAVE_RASCUNHO, JSON.stringify(DB)); } catch (e) {}
   atualizarPainel();
 }
-/* JSON público: remove as notas privadas */
 function gerarJSON({ completo = false } = {}) {
   const saida = {
     versao: DB.versao,
@@ -784,7 +772,7 @@ async function resolverTodas() {
     prog.textContent = `Buscando capas… ${i + 1}/${falt.length} (${ok} encontradas)`;
     const r = await resolverCapa(falt[i]);
     if (r) { falt[i].capa_url = r.url; falt[i].capa_fonte = r.fonte; delete CAPAS[falt[i].id]; ok++; persistir(); }
-    await esperar(450); // respeita limites das APIs
+    await esperar(450);
   }
   resolvendo = false;
   prog.textContent = `Concluído: ${ok} de ${falt.length} capas encontradas. Confira e baixe o livros.json.`;
@@ -885,7 +873,6 @@ function abrirFormLivro(livro) {
 
   const form = $('#form-livro');
 
-  // Contador e bloqueio de trechos com mais de 300 caracteres
   form.addEventListener('input', e => {
     const ta = e.target;
     if (ta.dataset && ta.dataset.t === 'texto') {
@@ -900,7 +887,6 @@ function abrirFormLivro(livro) {
   });
   $('#f-add-trecho').addEventListener('click', () => $('#lista-trechos').insertAdjacentHTML('beforeend', linhaTrecho()));
 
-  // Resolver capa com os dados atuais do formulário
   $('#f-resolver').addEventListener('click', async () => {
     const msg = $('#f-capa-msg');
     const temp = { titulo: form.titulo.value.trim(), isbn: form.isbn.value, autores: form.autores.value.split(/[;\n]/).map(s => s.trim()).filter(Boolean) };
@@ -925,7 +911,6 @@ function salvarLivro(form, original, novo) {
   if (!titulo) { erro.textContent = 'Informe o título.'; form.titulo.focus(); return; }
   if (!autores.length) { erro.textContent = 'Informe ao menos um autor.'; form.autores.focus(); return; }
 
-  // Trechos: texto até 300 caracteres e autor, título e página obrigatórios
   const trechos = [];
   for (const bloco of $$('.trecho-edit', form)) {
     const v = k => bloco.querySelector(`[data-t="${k}"]`).value.trim();
@@ -945,7 +930,6 @@ function salvarLivro(form, original, novo) {
   let anoL = num('ano_leitura');
   if (dataTermino) anoL = Number(dataTermino.slice(0, 4));
 
-  // Se o capa_url foi alterado à mão e a fonte não, a fonte antiga deixa de valer
   const capaUrl = g('capa_url');
   let capaFonte = g('capa_fonte');
   if (!capaUrl || (capaUrl !== original.capa_url && capaFonte === original.capa_fonte)) capaFonte = '';
@@ -1007,7 +991,7 @@ function excluirLivro(id) {
   else render({ foco: false });
 }
 
-/* ----- Configurações do site (título, subtítulo, meta anual, sobre) ----- */
+/* ----- Configurações do site ----- */
 function abrirFormConfig() {
   const c = DB.config;
   abrirModal(`
@@ -1039,7 +1023,12 @@ function abrirFormConfig() {
 
 /* ---------- 10. Inicialização ---------- */
 (async function iniciar() {
-  aplicarTema(document.documentElement.getAttribute('data-theme') || 'light');
-  if (EDITAR) montarPainel();
-  if (await carregar()) render({ foco: false });
+  try {
+    aplicarTema(document.documentElement.getAttribute('data-theme') || 'light');
+    if (EDITAR) montarPainel();
+    if (await carregar()) render({ foco: false });
+  } catch (err) {
+    console.error(err);
+    $('#conteudo').innerHTML = estadoVazio('Ocorreu um erro ao montar a página: ' + esc(err.message) + '. Abra o Console (F12) para ver detalhes.');
+  }
 })();
